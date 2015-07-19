@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,10 +25,26 @@ import kaaes.spotify.webapi.android.models.ArtistsPager;
  */
 public class MainActivityFragment extends Fragment {
 
-    List<String> artistsName = new ArrayList<String>();
-    List<String> images = new ArrayList<String>();
     CustomAdapter mArtistAdapter;
+    ArrayList<ArtistModel> artistList ;
 
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if(savedInstanceState == null || !savedInstanceState.containsKey("artistList")) {
+            artistList = new ArrayList<ArtistModel>();
+        }
+        else {
+            artistList = savedInstanceState.getParcelableArrayList("artistList");
+        }
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        outState.putParcelableArrayList("artistList", artistList);
+        super.onSaveInstanceState(outState);
+    }
 
     public MainActivityFragment() {
 
@@ -62,14 +77,14 @@ public class MainActivityFragment extends Fragment {
 
         // Create some dummy data for the ListView.  Here's a sample weekly forecast
        // mArtistAdapter = new CustomAdapter(getActivity(), new ArrayList<ListOfArtists>());
-        mArtistAdapter = new CustomAdapter(getActivity(), new ArrayList<Artist>());
+        mArtistAdapter = new CustomAdapter(getActivity(), artistList);
 
         ListView listView = (ListView) rootView.findViewById(R.id.main_listview);
         listView.setAdapter(mArtistAdapter);
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
-                Artist chosenArtist = mArtistAdapter.getItem(position);
+                ArtistModel chosenArtist = mArtistAdapter.getItem(position);
 
                 Intent intent = new Intent(getActivity(), DetailActivity.class)
                         .putExtra("artistName", chosenArtist.name)
@@ -114,18 +129,18 @@ public class MainActivityFragment extends Fragment {
                 mArtistAdapter.clear();
             }
 
-            Log.i("Artist", String.valueOf(artists.size()));
-            List<Artist> updateList = new ArrayList<Artist>();
+            //Log.i("Artist", String.valueOf(artists.size()));
+            List<ArtistModel> updateList = new ArrayList<ArtistModel>();
 
             for (Artist artist : artists){
                 if (artist.images.size() != 0){
-                    updateList.add(artist);
+                    updateList.add(new ArtistModel(artist.name, artist.id,artist.images.get(0).url));
                 }
             }
 
             // Corner case
             if(updateList.size() == 0){
-                Artist artist = new Artist();
+                ArtistModel artist = new ArtistModel();
                 artist.name = "There is no result for your search";
                 updateList.add(artist);
             }

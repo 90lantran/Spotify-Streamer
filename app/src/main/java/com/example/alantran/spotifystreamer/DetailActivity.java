@@ -27,6 +27,7 @@ public class DetailActivity extends ActionBarActivity {
 
 
     static TopTrackAdapter mTopTrackAdapter;
+    ArrayList<TrackModel> trackList ;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,10 +35,17 @@ public class DetailActivity extends ActionBarActivity {
 
         setContentView(R.layout.activity_detail);
 
+        Intent intent = getIntent();
+        String artistName = intent.getStringExtra("artistName");
+
+        getSupportActionBar().setSubtitle(artistName);
+
+
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
                     .add(R.id.container, new DetailFragment()).commit();
         }
+
     }
 
     @Override
@@ -73,6 +81,25 @@ public class DetailActivity extends ActionBarActivity {
         }
 
         @Override
+        public void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+
+            if (savedInstanceState == null || !savedInstanceState.containsKey("tracks")) {
+                trackList = new ArrayList<TrackModel>();
+            } else {
+                trackList = savedInstanceState.getParcelableArrayList("tracks");
+            }
+        }
+
+        @Override
+        public void onSaveInstanceState(Bundle outState) {
+            if (trackList != null) {
+                outState.putParcelableArrayList("tracks", trackList);
+            }
+            super.onSaveInstanceState(outState);
+        }
+
+        @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container,
                                  Bundle savedInstanceState) {
 
@@ -85,7 +112,7 @@ public class DetailActivity extends ActionBarActivity {
 
             ListView listView = (ListView) rootView.findViewById(R.id.track_list_listView);
 
-            mTopTrackAdapter = new TopTrackAdapter(getActivity(), new ArrayList<Track>());
+            mTopTrackAdapter = new TopTrackAdapter(getActivity(), trackList);
 
             listView.setAdapter(mTopTrackAdapter);
 
@@ -129,14 +156,14 @@ public class DetailActivity extends ActionBarActivity {
                 mTopTrackAdapter.clear();
             }
 
-            List<Track> updatedTrack = new ArrayList<Track>();
+            List<TrackModel> updatedTrack = new ArrayList<TrackModel>();
             for (Track track : tracks) {
-                updatedTrack.add(track);
+                updatedTrack.add(new TrackModel(track.name,track.album.name, track.album.images.get(0).url));
             }
 
             // Corner case
             if(updatedTrack.size() == 0){
-                Track track = new Track();
+                TrackModel track = new TrackModel();
                 track.name = "There is no result for your chosen artist";
                 updatedTrack.add(track);
             }
