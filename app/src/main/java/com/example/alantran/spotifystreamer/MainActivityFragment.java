@@ -1,6 +1,9 @@
 package com.example.alantran.spotifystreamer;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -18,6 +21,7 @@ import kaaes.spotify.webapi.android.SpotifyApi;
 import kaaes.spotify.webapi.android.SpotifyService;
 import kaaes.spotify.webapi.android.models.Artist;
 import kaaes.spotify.webapi.android.models.ArtistsPager;
+import retrofit.RetrofitError;
 
 
 /**
@@ -26,16 +30,14 @@ import kaaes.spotify.webapi.android.models.ArtistsPager;
 public class MainActivityFragment extends Fragment {
 
     CustomAdapter mArtistAdapter;
-    ArrayList<ArtistModel> artistList ;
-
+    ArrayList<ArtistModel> artistList;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if(savedInstanceState == null || !savedInstanceState.containsKey("artistList")) {
+        if (savedInstanceState == null || !savedInstanceState.containsKey("artistList")) {
             artistList = new ArrayList<ArtistModel>();
-        }
-        else {
+        } else {
             artistList = savedInstanceState.getParcelableArrayList("artistList");
         }
     }
@@ -50,6 +52,13 @@ public class MainActivityFragment extends Fragment {
 
     }
 
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -57,13 +66,17 @@ public class MainActivityFragment extends Fragment {
 
         SearchView mSearchView = (SearchView) rootView.findViewById(R.id.main_searchview);
         String query = mSearchView.getQuery().toString();
+        //Boolean flag = true;
+        // if (savedInstanceState == null) flag = false;
+        //final Boolean finalFlag = flag;
         mSearchView.setOnQueryTextListener(
                 new SearchView.OnQueryTextListener() {
                     @Override
                     public boolean onQueryTextSubmit(String query) {
                         FetchArtistsTask task = new FetchArtistsTask();
-                        task.execute(query);
-
+                        if (isNetworkAvailable()) {
+                            task.execute(query);
+                        }
                         return false;
                     }
 
@@ -74,9 +87,6 @@ public class MainActivityFragment extends Fragment {
                 }
         );
 
-
-        // Create some dummy data for the ListView.  Here's a sample weekly forecast
-       // mArtistAdapter = new CustomAdapter(getActivity(), new ArrayList<ListOfArtists>());
         mArtistAdapter = new CustomAdapter(getActivity(), artistList);
 
         ListView listView = (ListView) rootView.findViewById(R.id.main_listview);
@@ -88,8 +98,8 @@ public class MainActivityFragment extends Fragment {
 
                 Intent intent = new Intent(getActivity(), DetailActivity.class)
                         .putExtra("artistName", chosenArtist.name)
-                        .putExtra("artistId",chosenArtist.id)
-                        .putExtra("country","US");
+                        .putExtra("artistId", chosenArtist.id)
+                        .putExtra("country", "US");
                 startActivity(intent);
             }
         });
@@ -98,7 +108,7 @@ public class MainActivityFragment extends Fragment {
     }
 
 
-    public class FetchArtistsTask extends AsyncTask<String, Void, List<Artist>>  {
+    public class FetchArtistsTask extends AsyncTask<String, Void, List<Artist>> {
 
         private final String LOG_TAG = FetchArtistsTask.class.getSimpleName();
 
@@ -115,31 +125,36 @@ public class MainActivityFragment extends Fragment {
 
             SpotifyApi api = new SpotifyApi();
             SpotifyService service = api.getService();
+            ArtistsPager results;
+            List<Artist> artists = null;
+            try {
+                results = service.searchArtists(searchString);
+                artists = results.artists.items;
+            } catch (RetrofitError error) {
+                if (error.getResponse().getStatus() == 400)
+                    throw new RuntimeException("Bad request");
+            } finally {
+                return artists;
+            }
 
-            ArtistsPager results = service.searchArtists(searchString);
-            List<Artist> artists = results.artists.items;
-            return artists;
         }
 
         @Override
         protected void onPostExecute(List<Artist> artists) {
             super.onPostExecute(artists);
+            List<ArtistModel> updateList = new ArrayList<ArtistModel>();
 
             if (artists != null) {
                 mArtistAdapter.clear();
-            }
-
-            //Log.i("Artist", String.valueOf(artists.size()));
-            List<ArtistModel> updateList = new ArrayList<ArtistModel>();
-
-            for (Artist artist : artists){
-                if (artist.images.size() != 0){
-                    updateList.add(new ArtistModel(artist.name, artist.id,artist.images.get(0).url));
+                for (Artist artist : artists) {
+                    if (artist.images.size() != 0) {
+                        updateList.add(new ArtistModel(artist.name, artist.id, artist.images.get(0).url));
+                    }
                 }
             }
 
             // Corner case
-            if(updateList.size() == 0){
+            if (updateList.size() == 0) {
                 ArtistModel artist = new ArtistModel();
                 artist.name = "There is no result for your search";
                 updateList.add(artist);

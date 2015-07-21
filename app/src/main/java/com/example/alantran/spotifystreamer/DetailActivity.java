@@ -1,6 +1,9 @@
 package com.example.alantran.spotifystreamer;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -21,13 +24,14 @@ import java.util.Map;
 import kaaes.spotify.webapi.android.SpotifyApi;
 import kaaes.spotify.webapi.android.SpotifyService;
 import kaaes.spotify.webapi.android.models.Track;
+import retrofit.RetrofitError;
 
 
 public class DetailActivity extends ActionBarActivity {
 
 
     static TopTrackAdapter mTopTrackAdapter;
-    ArrayList<TrackModel> trackList ;
+    static ArrayList<TrackModel> trackList ;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,15 +73,23 @@ public class DetailActivity extends ActionBarActivity {
         return super.onOptionsItemSelected(item);
     }
 
+
     /**
      * A placeholder fragment containing a simple view.
      */
-    public class DetailFragment extends Fragment {
+    public static class DetailFragment extends Fragment {
 
         public final String LOG_TAG = DetailFragment.class.getSimpleName();
 
         public DetailFragment() {
 
+        }
+
+        private boolean isNetworkAvailable() {
+            ConnectivityManager connectivityManager
+                    = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+            return activeNetworkInfo != null && activeNetworkInfo.isConnected();
         }
 
         @Override
@@ -117,11 +129,14 @@ public class DetailActivity extends ActionBarActivity {
             listView.setAdapter(mTopTrackAdapter);
 
             FetchTrackTask task = new FetchTrackTask();
-            task.execute(artistId,country);
-
+            if (savedInstanceState == null && isNetworkAvailable()) {
+                task.execute(artistId, country);
+            }
             return rootView;
         }
     }
+
+
 
     public static class FetchTrackTask extends AsyncTask<String, Void, List<Track>> {
         private final String LOG_TAG = FetchTrackTask.class.getSimpleName();
@@ -139,26 +154,28 @@ public class DetailActivity extends ActionBarActivity {
             options.put(SpotifyService.OFFSET, 0);
             options.put(SpotifyService.LIMIT, 10);
             options.put(SpotifyService.COUNTRY, country);
-
-            List<Track> tracks = service.getArtistTopTrack(artistId, options).tracks;
-            for (Track track : tracks) {
-                Log.i(LOG_TAG, track.name);
+            List<Track> tracks = null;
+            try {
+                tracks = service.getArtistTopTrack(artistId, options).tracks;
+            } catch (RetrofitError error){
+                if (error.getResponse().getStatus() == 400)
+                    throw new RuntimeException("Bad request");
+            }
+            finally {
+                return tracks;
             }
 
-            return tracks;
         }
 
         @Override
         protected void onPostExecute(List<Track> tracks) {
             super.onPostExecute(tracks);
-
+            List<TrackModel>  updatedTrack = new ArrayList<TrackModel>();
             if (tracks != null) {
                 mTopTrackAdapter.clear();
-            }
-
-            List<TrackModel> updatedTrack = new ArrayList<TrackModel>();
-            for (Track track : tracks) {
-                updatedTrack.add(new TrackModel(track.name,track.album.name, track.album.images.get(0).url));
+                for (Track track : tracks) {
+                    updatedTrack.add(new TrackModel(track.name, track.album.name, track.album.images.get(0).url));
+                }
             }
 
             // Corner case
@@ -169,7 +186,6 @@ public class DetailActivity extends ActionBarActivity {
             }
 
             mTopTrackAdapter.addAll(updatedTrack);
-
         }
     }
 }
